@@ -1,0 +1,79 @@
+name: State Components – Lint and Test
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Run linter
+      - name: Run Linter
+        run: npm run lint # Replace with your lint command
+
+      # Run tests
+      - name: Run Tests
+        run: npm test # Replace with your test command
+
+  update-submodules:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.CUSTAPP_REPO_TOKEN }}
+          submodules: false
+
+      - name: Authenticate Git with Personal Access Token
+        run: |
+          git config --global url."https://${{ secrets.CUSTAPP_REPO_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      - name: Set Git User Identity
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI Bot"
+
+      # Merge dev branch into qa branch if the commit message contains "--ca-qa"
+      - name: Merge dev branch into qa branch
+        run: |
+          git fetch --all
+          if [[ '${{ github.event.head_commit.message }}' == *"--ca-qa"* ]]; then
+            echo "Merging dev branch into qa branch"
+            git checkout dev  # Checkout the latest dev branch
+            git pull origin dev
+            git checkout qa  # Checkout the latest qa branch
+            git merge dev --allow-unrelated-histories -X theirs || true
+
+            # Handle conflicts if any
+            if ! git diff --check --exit-code; then
+              echo "Automatically resolving conflicts in favor of dev branch."
+              git add .
+              git commit -m "Resolve merge conflicts by taking changes from dev branch"
+            fi
+
+            # Commit and push changes after merging
+            git push origin qa
+          else
+            echo "No merge action required."
+          fi
+
+      - name: Trigger Admin Repository Update Workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          repository: bgfborges/Admin
+          event-type: update-submodule
+          token: ${{ secrets.ADMIN_REPO_TOKEN }}
+
+      - name: Trigger CustApp Repository Update Workflow
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          repository: bgfborges/CustApp
+          event-type: update-submodule
+          token: ${{ secrets.CUSTAPP_REPO_TOKEN }}
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "qa-action": "${{ github.event.head_commit.message }}" }'
