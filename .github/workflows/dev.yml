@@ -1,0 +1,91 @@
+name: Update State Components in CustApp
+
+on:
+  repository_dispatch:
+    types: [update-submodule]
+
+jobs:
+  update-state-components:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout CustApp repository without submodules
+      - name: Checkout CustApp repository
+        uses: actions/checkout@v3
+        with:
+          submodules: false
+          token: ${{ secrets.CUSTAPP_REPO_TOKEN }}
+
+      # Step 2: Check if the branch is 'dev'
+      - name: Check branch
+        id: check-branch
+        run: echo "should-run=$([[ '${{ github.event.client_payload.ref }}' == 'refs/heads/dev' ]] && echo true || echo false)" >> $GITHUB_ENV
+
+      # Step 3: Exit if not on dev branch
+      - name: Exit if not on dev branch
+        if: env.should-run != 'true'
+        run: |
+          echo "This workflow only runs on the dev branch. Exiting..."
+          exit 0
+
+      # Step 4: Checkout dev branch
+      - name: Checkout dev branch
+        if: env.should-run == 'true'
+        run: |
+          git checkout dev
+
+      # Step 5: Authenticate Git with Personal Access Token
+      - name: Authenticate Git
+        if: env.should-run == 'true'
+        run: |
+          git config --global url."https://${{ secrets.CUSTAPP_REPO_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      # Step 6: Set Git User Identity
+      - name: Set Git User Identity
+        if: env.should-run == 'true'
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI Bot"
+
+      # Step 7: Update state-components submodule to the latest commit on dev branch
+      - name: Update state-components submodule
+        if: env.should-run == 'true'
+        run: |
+          git fetch --all
+          git submodule update --init --recursive
+          cd state-components
+          git checkout dev  # Ensure the submodule is on the dev branch
+          git pull origin dev  # Pull the latest changes from the dev branch
+          cd ..
+          git add state-components
+          git commit -m "Update state-components submodule reference to the latest commit"
+          git push origin dev
+          git checkout qa
+          cd state-components
+          git pull origin qa
+          git checkout qa
+          git pull origin qa  # Pull the latest changes from the dev branch
+          cd ..
+          git add state-components
+          git commit -m "Update state-components submodule reference to the latest commit"
+          git push origin qa
+
+      # Step 11: Run lints
+      - name: Run Lints
+        if: env.should-run == 'true'
+        run: |
+          # Replace the following command with your lint command(s)
+          # npm install
+          # npm run lint
+
+      # Step 12: Run tests
+      - name: Run Tests
+        if: env.should-run == 'true'
+        run: |
+          # Replace the following command with your test command(s)
+          # npm run test
+
+      # Step 13: Deploy Placeholder
+      - name: Deploy CustApp Placeholder
+        if: env.should-run == 'true'
+        run: echo "Deploy CustApp Placeholder"
