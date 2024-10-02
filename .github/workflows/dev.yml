@@ -1,8 +1,8 @@
-name: Update State Components in CustApp
+name: Update State Components in Admin
 
 on:
   repository_dispatch:
-    types: [update-submodule]
+    types: [admin-update-submodule]
 
 jobs:
   update-state-components:
@@ -10,7 +10,7 @@ jobs:
 
     steps:
       # Step 1: Checkout CustApp repository without submodules
-      - name: Checkout CustApp repository
+      - name: Checkout Admin repository
         uses: actions/checkout@v3
         with:
           submodules: false
@@ -86,6 +86,6 @@ jobs:
           # npm run test
 
       # Step 13: Deploy Placeholder
-      - name: Deploy CustApp Placeholder
+      - name: Deploy Admin Placeholder
         if: env.should-run == 'true'
         run: echo "Deploy CustApp Placeholder"
